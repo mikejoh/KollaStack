@@ -1,0 +1,62 @@
+---
+- name: Disable UFW
+  ufw:
+    state: disabled
+
+- name: Stop and disable ufw via systemd
+  systemd:
+    name: ufw
+    state: stopped
+    enabled: no
+
+- name: Add Docker GPG apt Key
+  apt_key:
+    url: https://download.docker.com/linux/ubuntu/gpg
+    state: present
+
+- name: Add Docker Repository
+  apt_repository:
+    repo: deb https://download.docker.com/linux/ubuntu bionic stable
+    state: present
+
+- name: Install required packages
+  apt:
+    name: "{{ item }}"
+    state: latest
+    update_cache: yes
+  with_items: 
+    - apt-transport-https
+    - ca-certificates
+    - curl
+    - software-properties-common
+    - python3-pip
+    - python3-setuptools
+    - python3-dev
+    - git
+    - gcc
+    - docker-ce
+
+- name: Start and enable docker-ce via systemd
+  systemd:
+    name: docker
+    state: started
+    enabled: yes
+
+- name: Append user public SSH key to authorized_keys
+  authorized_key:
+    user: "ubuntu"
+    state: present
+    key: "{{ lookup('file', item) }}"
+  with_fileglob:
+    - "{{ ssh_pub_key }}"
+
+- name: Create cinder-volumes LVM volume group
+  lvg:
+    vg: cinder-volumes
+    pvs: [ "/dev/sdc" ]
+
+- name: Remove 127.0.2.1 from /etc/hosts # Hack due to conflicting entries in hosts-file
+  lineinfile:
+    path: /etc/hosts
+    regexp: "127.0.2.1"
+    state: absent

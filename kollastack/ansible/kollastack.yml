@@ -1,0 +1,6 @@
+---
+- hosts: kollastack-aio-vm
+  become: yes
+  gather_facts: False
+  roles:
+    - bootstrap

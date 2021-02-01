@@ -1,0 +1,10 @@
+---
+image_name: "ubuntu/bionic64"
+vcpu: "2"
+ram: "8192"
+vm_ip: "192.168.50.10"
+vm_name: "kollastack-aio"
+root_disk_size: "15GB"
+cinder_disk_size: 15
+cinder_disk_path: "/tmp/vm_storage.vmdk"
+ssh_pub_key_path: "/home/mikael/.ssh/id_rsa.pub"

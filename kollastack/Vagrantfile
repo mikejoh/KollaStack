@@ -1,0 +1,60 @@
+# encoding: utf-8
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+
+Vagrant.require_version ">= 2.2.14"
+VAGRANTFILE_API_VERSION = "2"
+
+require 'yaml'
+
+current_dir = File.dirname(File.expand_path(__FILE__))
+vagrant_config = YAML.load_file("#{current_dir}/vagrant.yml")
+
+Vagrant.configure("2") do |config|  
+    required_plugins = %w( vagrant-disksize ) 
+    _retry = false
+    required_plugins.each do |plugin|
+        unless Vagrant.has_plugin? plugin
+            system "vagrant plugin install #{plugin}"
+            _retry=true
+        end
+    end
+
+    config.ssh.insert_key = true
+    config.disksize.size = vagrant_config['root_disk_size']
+
+    config.vm.define "kollastack-aio-vm" do |k|
+        k.vm.box = vagrant_config['image_name']
+        k.vm.network "private_network", ip: vagrant_config['vm_ip']
+        k.vm.hostname = vagrant_config['vm_name']
+
+        config.vm.provider "virtualbox" do |vb|
+            vb.name = vagrant_config['vm_name']
+            vb.cpus = vagrant_config['vcpu']
+            vb.memory = vagrant_config['ram']
+            vb.customize [ "modifyvm", :id, "--nictype1", "virtio"]
+            vb.customize [ "modifyvm", :id, "--cableconnected1", "on"]
+            vb.customize [ "modifyvm", :id, "--nicpromisc2", "deny"]
+            vb.customize [ "modifyvm", :id, "--nictype2", "virtio"]
+            vb.customize [ "modifyvm", :id, "--cableconnected2", "on"]
+            vb.customize [ "modifyvm", :id, "--nic3", "natnetwork"]
+            vb.customize [ "modifyvm", :id, "--nat-network3", "extnet"]
+            vb.customize [ "modifyvm", :id, "--nicpromisc3", "allow-all"]
+            vb.customize [ "modifyvm", :id, "--nictype3", "virtio"]
+            vb.customize [ "modifyvm", :id, "--cableconnected3", "on"]
+            
+            file_to_disk = vagrant_config['cinder_disk_path']
+            unless File.exist?(file_to_disk)
+                vb.customize [ "createmedium", "disk", "--filename", file_to_disk, "--format", "vmdk", "--size", vagrant_config['cinder_disk_size'] * 1024 ]
+            end
+            vb.customize [ "storageattach", :id, "--storagectl", "SCSI", "--port", "2", "--device", "0", "--type", "hdd", "--medium", file_to_disk]
+        end
+
+        k.vm.provision "ansible" do |a|
+            a.extra_vars = {
+                ssh_pub_key: vagrant_config['ssh_pub_key_path']
+            } 
+            a.playbook = "ansible/kollastack.yml"
+        end
+    end
+end 
